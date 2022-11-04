@@ -3,10 +3,12 @@ import * as ts from 'typescript';
 import * as chalk from 'chalk';
 import { logError, logInfo } from '../common';
 import { config } from '../config';
+import { shake } from './shake';
 
 export type TypeScriptOptions = {
     base: 'normal',
     entry: string | string[],
+    module?: 'es' | 'commonjs', // default to commonjs for now
     // no: no source map, normal: separated source map have source map url, hide: separated source map, no source map url
     sourceMap: 'no' | 'normal' | 'hide',
     watch: boolean,
@@ -54,7 +56,7 @@ export const MyJSXRuntime = '' +
 const basicOptions: ts.CompilerOptions = {
     lib: ['lib.esnext.d.ts'],
     target: ts.ScriptTarget.ESNext,
-    module: ts.ModuleKind.CommonJS,
+    module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
     skipLibCheck: true,
     noEmitOnError: true,
@@ -62,14 +64,14 @@ const basicOptions: ts.CompilerOptions = {
     // I spent some time to fix non strict warnings and a lot of tsc-is-not-clever-enough / their-document-says-this-ask-them exclamation marks
     // (one of the reasons is that my (FreskyZ@outlook.com) code is very strongly typed and well considered safe)
     // so I decided to continue this pattern, every some time use this environment variable to check for non strict warnings and possible errors, but most of the time this switch is not on
-    strict: 'AKARIN_TS_STRICT' in process.env,
+    strict: 'AKARIN_STRICT' in process.env,
     noImplicitAny: true,
     noFallthroughCaseInSwitch: true,
     noImplicitReturns: true,
     noImplicitThis: true,
     noUnusedLocals: true,
     noUnusedParameters: true,
-    strictNullChecks: 'AKARIN_TS_STRICT' in process.env,
+    strictNullChecks: 'AKARIN_STRICT' in process.env,
     strictFunctionTypes: true,
     strictBindCallApply: true,
     removeComments: true,
@@ -78,6 +80,7 @@ const basicOptions: ts.CompilerOptions = {
 function mergeOptions(options: TypeScriptOptions): ts.CompilerOptions {
     return options.base == 'normal' ? {
         ...basicOptions,
+        module: options.module == 'es' ? ts.ModuleKind.ESNext : ts.ModuleKind.CommonJS,
         outDir: '/vbuild', // git simply virtual path to normal config
         sourceMap: options.sourceMap != 'no',
         lib: 'additionalLib' in options ? [...basicOptions.lib!, ...options.additionalLib!.map(b => `lib.${b}.d.ts`)] : basicOptions.lib,
@@ -87,7 +90,6 @@ function mergeOptions(options: TypeScriptOptions): ts.CompilerOptions {
         target: ts.ScriptTarget.ES2018, // edge chromium android is not supporting es2020
         sourceMap: false,
         esModuleInterop: true,
-        module: ts.ModuleKind.ESNext,
         jsx: ts.JsxEmit.ReactJSX,
         lib: [...basicOptions.lib!, 'lib.dom.d.ts'],
     } : /* jsx-app */ {
@@ -98,7 +100,6 @@ function mergeOptions(options: TypeScriptOptions): ts.CompilerOptions {
         target: ts.ScriptTarget.ES2018, // edge chromium android is not supporting es2020
         sourceMap: true,
         esModuleInterop: true,
-        module: ts.ModuleKind.ESNext,
         jsx: ts.JsxEmit.ReactJSX,
         lib: [...basicOptions.lib!, 'lib.dom.d.ts'],
     };
@@ -163,7 +164,7 @@ function printEmitResult(emitResult: ts.EmitResult): boolean {
 }
 
 // install on ts.sys, already replace by akaric, call additional hook if exists
-function setupReadFileHook() {
+function setupReadFileHookForConfigSubstitution() {
     const originalReadFile = ts.sys.readFile;
     ts.sys.readFile = (fileName, encoding) => {
         let fileContent = originalReadFile(fileName, encoding);
@@ -230,24 +231,41 @@ class TypeScriptChecker {
     public check(): TypeScriptResult {
         logInfo('tsc', chalk`once {yellow ${this.options.entry}}`);
         if (this.options.base != 'normal' || typeof this.options.configSubstitution == 'undefined' || this.options.configSubstitution) {
-            setupReadFileHook();
+            setupReadFileHookForConfigSubstitution();
         }
 
         const entry = Array.isArray(this.options.entry) ? this.options.entry : [this.options.entry];
         const program = ts.createProgram(entry, this.compilerOptions, ts.createCompilerHost(this.compilerOptions));
 
+        const checker = program.getTypeChecker();
+        ts.createSourceFile
+        ts.factory.createSourceFile
+        ts.setSourceMapRange
+        program.getTypeChecker
+        program.getSemanticDiagnostics
         const files: TypeScriptResult['files'] = [];
-        const emitResult = program.emit(undefined, createWriteFileHook(this.options, files));
+        const emitResult = program.emit(undefined, createWriteFileHook(this.options, files), undefined, undefined);
 
         const success = printEmitResult(emitResult);
         return { success, files };
+    }
+
+    public check2() {
+        logInfo('tsc', chalk`once {yellow ${this.options.entry}}`);
+        if (this.options.base != 'normal' || typeof this.options.configSubstitution == 'undefined' || this.options.configSubstitution) {
+            setupReadFileHookForConfigSubstitution();
+        }
+
+        const entry = Array.isArray(this.options.entry) ? this.options.entry : [this.options.entry];
+        const program = ts.createProgram(entry, this.compilerOptions, ts.createCompilerHost(this.compilerOptions));
+
     }
 
     // callback only called when watch recheck success
     public watch(callback: (result: TypeScriptResult) => any) {
         logInfo(`tsc${this.additionalHeader}`, chalk`watch {yellow ${this.options.entry}}`);
         if (this.options.base != 'normal' || typeof this.options.configSubstitution == 'undefined' || this.options.configSubstitution) {
-            setupReadFileHook();
+            setupReadFileHookForConfigSubstitution();
         }
 
         // NOTE: the following hooked emit will only write changed files, so this list is in this scope instead of that hook scope

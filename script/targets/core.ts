@@ -11,6 +11,7 @@ import { MyPackOptions, MyPackResult, mypack } from '../tools/mypack';
 const getTypescriptOptions = (watch: boolean): TypeScriptOptions => ({
     base: 'normal',
     entry: 'src/core/index.ts',
+    module: 'es',
     sourceMap: 'hide',
     watch,
 });
@@ -37,23 +38,20 @@ export async function uploadConfig(): Promise<void> {
 async function buildOnce(): Promise<void> {
     logInfo('akr', chalk`{cyan core}`);
     await eslint('core', 'node', ['src/shared/**/*.ts', 'src/core/**/*.ts']);
-    // mkdir(recursive) is not needed anymore
-    // as I'm lazy to investigate ssh version, now it's assumed that server has already full deployed once and all folder already exists
+    // TODO make server file structure
 
     const checkResult = typescript(getTypescriptOptions(false)).check();
     if (!checkResult.success) {
         return logCritical('akr', chalk`{cyan core} failed at check`);
     }
-
-    const packResult = await mypack(getMyPackOptions(checkResult.files)).run();
-    if (!packResult.success) {
-        return logCritical('akr', chalk`{cyan core} failed at pack`);
-    }
-
-    const uploadResult = await upload(getUploadAssets(packResult));
-    if (!uploadResult) {
-        return logCritical('akr', chalk`{cyan core} failed at upload`);
-    }
+    // const packResult = await mypack(getMyPackOptions(checkResult.files)).run();
+    // if (!packResult.success) {
+    //     return logCritical('akr', chalk`{cyan core} failed at pack`);
+    // }
+    // const uploadResult = await upload(getUploadAssets(packResult));
+    // if (!uploadResult) {
+    //     return logCritical('akr', chalk`{cyan core} failed at upload`);
+    // }
 
     logInfo('akr', chalk`{cyan core} completed successfully`);
 }
