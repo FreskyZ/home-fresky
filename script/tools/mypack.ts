@@ -308,6 +308,9 @@ class MyPacker {
                     filename: this.options.output,     // this is new SourceMapGenerator({ file }), which I do not use
                     url: this.options.output + '.map', // this is generated //#sourceMapURL, which I do not use
                 },
+                compress: {
+                    ecma: 2015,
+                },
                 format: {
                     max_line_len: 'AKARIN_SELF_MULTILINE' in process.env ? 120 : undefined,
                 },

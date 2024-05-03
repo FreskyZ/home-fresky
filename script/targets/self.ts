@@ -76,7 +76,9 @@ export async function build(): Promise<void> {
         return logCritical('akr', chalk`{cyan self} failed at pack`);
     }
 
-    const resultjs = packResult.resultJs.toString('utf-8').replaceAll('self' + 'hash', await hashself());
+    // ATTENTION this replace only replace first and that is expected to be the one in index.ts (which is true for current mypack implementation)
+    // curently terser very cleverly evaluates things like 'self' + 'hash' to selfhash which makes replaceAll does not work correctly
+    const resultjs = packResult.resultJs.toString('utf-8').replace('selfhash', await hashself());
     await fs.promises.writeFile('akari', resultjs);
 
     logInfo('akr', chalk`{cyan self} completed successfully`);
